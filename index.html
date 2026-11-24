@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>놀이의 전략 - 중2 확률 보드게임</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Jua & Pretendard/Noto Sans KR for friendly, crisp boardgame look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Tone.js for sound effects (no external audio files) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti for victory celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --bg-cream: #FFFDF7;
+            --board-wood: #F5E6D3;
+            --board-border: #D4B895;
+            --p1-color: #2563EB;
+            --p1-light: #DBEAFE;
+            --p2-color: #E11D48;
+            --p2-light: #FFE4E6;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #F0F4F8;
+            background-image: radial-gradient(#CBD5E1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        .font-jua {
+            font-family: 'Jua', sans-serif;
+        }
+
+        /* 3D Boardgame Button Style */
+        .btn-3d {
+            transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
+        }
+        .btn-3d:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+        }
+        .btn-3d:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: translateY(3px);
+        }
+
+        /* Board Cell Styling (Textbook 4x3 Grid inspired) */
+        .board-cell {
+            background: #FFFFFF;
+            border: 2.5px dashed #CBD5E1;
+            transition: all 0.2s ease;
+        }
+        .board-cell.interactive:hover {
+            border-color: #94A3B8;
+            background-color: #F8FAFC;
+        }
+        .board-cell.interactive:active {
+            transform: scale(0.97);
+        }
+        .board-cell.highlight-hit {
+            border: 3px solid #F59E0B !important;
+            background-color: #FEF3C7 !important;
+            animation: pulseHit 0.6s ease-in-out 2;
+            z-index: 10;
+        }
+
+        @keyframes pulseHit {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Token Styling */
+        .token-p1 {
+            background: radial-gradient(circle at 30% 30%, #60A5FA, #2563EB);
+            box-shadow: 0 2px 3px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255,255,255,0.6);
+            border: 1.5px solid #1D4ED8;
+        }
+        .token-p2 {
+            background: radial-gradient(circle at 30% 30%, #FB7185, #E11D48);
+            box-shadow: 0 2px 3px rgba(225, 29, 72, 0.4), inset 0 1px 1px rgba(255,255,255,0.6);
+            border: 1.5px solid #BE123C;
+        }
+
+        /* Token Pop & Vanish Animations */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes vanishToken {
+            0% { transform: scale(1); opacity: 1; }
+            40% { transform: scale(1.4) rotate(15deg); opacity: 0.9; filter: brightness(1.3); }
+            100% { transform: scale(0) rotate(-30deg); opacity: 0; }
+        }
+        .animate-vanish {
+            animation: vanishToken 0.55s ease-in forwards;
+        }
+
+        /* Dice Styling & Rolling Animation */
+        .dice-box {
+            background: linear-gradient(145deg, #ffffff, #f1f5f9);
+            border: 3px solid #334155;
+            box-shadow: 0 6px 0 #334155, 0 10px 15px rgba(0,0,0,0.15);
+        }
+        @keyframes diceShake {
+            0% { transform: rotate(0deg) scale(1); }
+            20% { transform: rotate(-18deg) scale(1.1) translateY(-6px); }
+            40% { transform: rotate(18deg) scale(1.1) translateY(4px); }
+            60% { transform: rotate(-14deg) scale(1.08) translateY(-4px); }
+            80% { transform: rotate(14deg) scale(1.05) translateY(2px); }
+            100% { transform: rotate(0deg) scale(1); }
+        }
+        .dice-rolling {
+            animation: diceShake 0.45s ease-in-out infinite;
+        }
+
+        /* Active Turn Glow */
+        .turn-glow-p1 {
+            box-shadow: 0 0 0 4px #3B82F6, 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+        }
+        .turn-glow-p2 {
+            box-shadow: 0 0 0 4px #F43F5E, 0 10px 25px -5px rgba(244, 63, 94, 0.4);
+        }
+
+        /* Smooth Screen Transitions */
+        .screen-section {
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .hidden-screen {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800">
+
+    <!-- Top Mini Header -->
+    <header class="w-full bg-white/90 backdrop-blur-sm border-b border-slate-200 px-4 py-2 flex items-center justify-between shadow-sm z-20">
+        <div class="flex items-center gap-2">
+            <span class="bg-indigo-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">중2 수학 · 확률</span>
+            <h1 class="font-jua text-xl sm:text-2xl text-slate-800 tracking-wide">🎲 놀이의 전략</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btn-sound-toggle" onclick="toggleSound()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center gap-1 transition" title="효과음 켜기/끄기">
+                <span id="sound-icon">🔊</span>
+                <span class="hidden sm:inline" id="sound-text">효과음 ON</span>
+            </button>
+            <button onclick="openHelpModal()" class="p-2 px-3 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 text-sm font-bold flex items-center gap-1 transition">
+                <span>📖</span>
+                <span>게임 규칙</span>
+            </button>
+            <button id="btn-home-top" onclick="confirmGoHome()" class="hidden p-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold transition">
+                처음으로
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container (Optimized for Landscape Tablet without scroll) -->
+    <main class="flex-1 w-full max-w-6xl mx-auto p-3 sm:p-4 flex items-center justify-center">
+
+        <!-- ==========================================
+             SCREEN 1: START SCREEN (시작 화면)
+        =========================================== -->
+        <section id="screen-start" class="screen-section w-full max-w-3xl bg-white rounded-3xl shadow-xl border-2 border-slate-200 p-6 sm:p-8 text-center">
+            <div class="inline-block bg-indigo-100 text-indigo-700 font-bold px-4 py-1.5 rounded-full text-sm mb-3">
+                주사위 2개의 합이 나올 확률을 예측하라!
+            </div>
+            <h2 class="font-jua text-4xl sm:text-5xl text-slate-800 mb-2 tracking-tight">
+                🎲 놀이의 전략
+            </h2>
+            <p class="text-slate-500 text-sm sm:text-base mb-6">
+                한 대의 태블릿에서 친구와 함께 말 10개를 배치하고 승부를 겨루는 2인용 수학 보드게임
+            </p>
+
+            <!-- Player Name Inputs -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <!-- Player 1 -->
+                <div class="bg-blue-50/80 border-2 border-blue-200 rounded-2xl p-4 text-left">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-5 h-5 rounded-full token-p1 inline-block"></span>
+                        <label for="input-p1-name" class="font-bold text-blue-800 text-base">플레이어 1 (파란색 · 선공)</label>
+                    </div>
+                    <input type="text" id="input-p1-name" value="선공" maxlength="8" placeholder="이름 입력 (최대 8자)"
+                        class="w-full bg-white border-2 border-blue-300 focus:border-blue-600 focus:outline-none rounded-xl px-4 py-2.5 text-lg font-bold text-slate-800 transition">
+                </div>
+
+                <!-- Player 2 -->
+                <div class="bg-rose-50/80 border-2 border-rose-200 rounded-2xl p-4 text-left">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="w-5 h-5 rounded-full token-p2 inline-block"></span>
+                        <label for="input-p2-name" class="font-bold text-rose-800 text-base">플레이어 2 (빨간색 · 후공)</label>
+                    </div>
+                    <input type="text" id="input-p2-name" value="후공" maxlength="8" placeholder="이름 입력 (최대 8자)"
+                        class="w-full bg-white border-2 border-rose-300 focus:border-rose-600 focus:outline-none rounded-xl px-4 py-2.5 text-lg font-bold text-slate-800 transition">
+                </div>
+            </div>
+
+            <!-- Quick Rules Summary Box -->
+            <div class="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 mb-7 text-left text-sm sm:text-base text-slate-700">
+                <h3 class="font-bold text-amber-900 mb-2 flex items-center gap-1.5">
+                    <span>💡</span> 핵심 게임 방법
+                </h3>
+                <ul class="space-y-1.5 list-disc list-inside text-slate-700">
+                    <li>각자 <b>10개의 말</b>을 숫자 <b>2 ~ 12</b> 칸 중 <b>서로 다른 4칸 이상</b>에 나누어 배치합니다.</li>
+                    <li>번갈아 <b>주사위 2개</b>를 굴려 나온 <b>두 눈의 합</b>에 해당하는 칸의 <b>모든 말(상대 말 포함)</b>을 제거합니다.</li>
+                    <li>자신의 말 10개를 <b>가장 먼저 모두 제거</b>한 플레이어가 승리합니다!</li>
+                </ul>
+            </div>
+
+            <!-- Start Button -->
+            <button onclick="startGameSetup()" class="btn-3d w-full sm:w-auto px-12 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-jua text-2xl rounded-2xl tracking-wider">
+                게임 시작하기 ▶
+            </button>
+        </section>
+
+        <!-- ==========================================
+             SCREEN 2: PIECE PLACEMENT SCREEN (말 배치 화면)
+        =========================================== -->
+        <section id="screen-setup" class="screen-section hidden-screen w-full grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+            
+            <!-- Left Control Panel (Player Status & Instructions) -->
+            <div class="lg:col-span-4 bg-white rounded-3xl shadow-lg border-2 border-slate-200 p-5 flex flex-col justify-between">
+                <div>
+                    <!-- Step Badge -->
+                    <div class="flex items-center justify-between mb-3">
+                        <span id="setup-step-badge" class="px-3 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-700">
+                            STEP 1 / 2 · 선공 배치
+                        </span>
+                        <span class="text-xs text-slate-400 font-medium">상대방이 보지 않게 배치하세요!</span>
+                    </div>
+
+                    <!-- Current Setup Player Banner -->
+                    <div id="setup-player-card" class="rounded-2xl p-4 mb-4 border-2 bg-blue-50 border-blue-300">
+                        <div class="flex items-center gap-3">
+                            <div id="setup-player-token" class="w-10 h-10 rounded-full token-p1 flex-shrink-0"></div>
+                            <div>
+                                <p class="text-xs font-bold opacity-75" id="setup-player-role">플레이어 1 (파란색)</p>
+                                <h2 class="font-jua text-2xl sm:text-3xl text-slate-800" id="setup-player-name">선공</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Placement Counters -->
+                    <div class="space-y-3 mb-4">
+                        <!-- Placed Tokens Count -->
+                        <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-bold text-slate-700">배치한 말 개수</p>
+                                <p class="text-xs text-slate-500">총 10개를 모두 놓아야 합니다</p>
+                            </div>
+                            <div class="text-right">
+                                <span id="setup-count-placed" class="font-jua text-3xl text-indigo-600">0</span>
+                                <span class="font-bold text-slate-400 text-lg"> / 10</span>
+                            </div>
+                        </div>
+
+                        <!-- Distinct Cells Count (Min 4 rule) -->
+                        <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-bold text-slate-700">선택한 숫자 칸 수</p>
+                                <p class="text-xs text-slate-500">서로 다른 <b>4칸 이상</b> 필수</p>
+                            </div>
+                            <div class="text-right">
+                                <span id="setup-count-cells" class="font-jua text-3xl text-amber-600">0</span>
+                                <span class="font-bold text-slate-400 text-sm"> 칸 (최소 4칸)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Validation Hint Message -->
+                    <div id="setup-validation-msg" class="text-xs sm:text-sm font-medium text-slate-600 bg-slate-100 rounded-xl p-3 mb-4">
+                        👉 오른쪽 놀이판의 숫자 칸을 터치해 말을 추가하고, <b>[ - ]</b> 버튼으로 뺄 수 있습니다.
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="space-y-2.5 pt-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="resetCurrentSetup()" class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition">
+                            🔄 전체 초기화
+                        </button>
+                        <button onclick="randomCurrentSetup()" class="py-2.5 px-3 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold text-sm transition">
+                            🎲 무작위 배치
+                        </button>
+                    </div>
+                    <button id="btn-setup-done" onclick="confirmPlayerSetup()" disabled
+                        class="btn-3d w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-jua text-xl rounded-2xl tracking-wide">
+                        배치 완료 ✔
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Board Area (4x3 Grid like Textbook) -->
+            <div class="lg:col-span-8 bg-[#F5E6D3] rounded-3xl shadow-lg border-4 border-[#D4B895] p-3 sm:p-5 flex flex-col justify-center">
+                <div class="grid grid-cols-4 gap-2.5 sm:gap-3.5 h-full">
+                    <!-- Top-Left Title Cell (Matches Textbook Layout) -->
+                    <div class="bg-[#EAD4B7] border-2 border-[#C8A982] rounded-2xl flex flex-col items-center justify-center p-2 text-center shadow-inner">
+                        <span class="font-jua text-2xl sm:text-3xl text-[#6B4C2A]">놀이판</span>
+                        <span class="text-xs font-bold text-[#8C6840] mt-1">칸을 눌러 말 배치</span>
+                    </div>
+
+                    <!-- Numbers 2 to 12 will be rendered here by JS -->
+                    <div id="setup-grid-cells" class="contents"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             SCREEN 3: MAIN GAME SCREEN (게임 진행 화면)
+        =========================================== -->
+        <section id="screen-game" class="screen-section hidden-screen w-full grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+            
+            <!-- Left Column: Players Info & Dice Control (4 cols) -->
+            <div class="lg:col-span-4 flex flex-col justify-between gap-3">
+                
+                <!-- Players Scoreboard Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-1 gap-2.5">
+                    <!-- Player 1 Card -->
+                    <div id="game-card-p1" class="bg-white rounded-2xl p-3 sm:p-4 border-2 border-blue-200 transition-all duration-300">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-4 h-4 rounded-full token-p1 inline-block"></span>
+                                <span id="game-name-p1" class="font-jua text-lg sm:text-xl text-slate-800 truncate max-w-[100px] sm:max-w-[140px]">선공</span>
+                            </div>
+                            <span id="game-turn-badge-p1" class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white">
+                                현재 턴!
+                            </span>
+                        </div>
+                        <div class="flex items-end justify-between mt-2 pt-2 border-t border-slate-100">
+                            <div>
+                                <span class="text-xs text-slate-500 block">남은 말</span>
+                                <span id="game-rem-p1" class="font-jua text-2xl sm:text-3xl text-blue-600">10</span>
+                                <span class="text-xs font-bold text-slate-400">개</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500 block">제거한 말</span>
+                                <span id="game-elim-p1" class="font-bold text-base sm:text-lg text-slate-700">0</span>
+                                <span class="text-xs text-slate-400">개</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Player 2 Card -->
+                    <div id="game-card-p2" class="bg-white rounded-2xl p-3 sm:p-4 border-2 border-rose-200 transition-all duration-300 opacity-75">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-4 h-4 rounded-full token-p2 inline-block"></span>
+                                <span id="game-name-p2" class="font-jua text-lg sm:text-xl text-slate-800 truncate max-w-[100px] sm:max-w-[140px]">후공</span>
+                            </div>
+                            <span id="game-turn-badge-p2" class="hidden px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-600 text-white">
+                                현재 턴!
+                            </span>
+                        </div>
+                        <div class="flex items-end justify-between mt-2 pt-2 border-t border-slate-100">
+                            <div>
+                                <span class="text-xs text-slate-500 block">남은 말</span>
+                                <span id="game-rem-p2" class="font-jua text-2xl sm:text-3xl text-rose-600">10</span>
+                                <span class="text-xs font-bold text-slate-400">개</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500 block">제거한 말</span>
+                                <span id="game-elim-p2" class="font-bold text-base sm:text-lg text-slate-700">0</span>
+                                <span class="text-xs text-slate-400">개</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dice & Action Arena -->
+                <div class="flex-1 bg-white rounded-3xl shadow-lg border-2 border-slate-200 p-4 flex flex-col items-center justify-between text-center">
+                    
+                    <!-- Turn & Result Status Banner -->
+                    <div id="game-status-banner" class="w-full py-2 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 font-bold text-sm sm:text-base">
+                        <span id="game-turn-text">선공님의 차례입니다! 주사위를 굴려주세요.</span>
+                    </div>
+
+                    <!-- Two 3D-style Dice Display -->
+                    <div class="my-3 flex items-center justify-center gap-3 sm:gap-4">
+                        <div id="dice-1" class="dice-box w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center p-2">
+                            <!-- SVG Pip rendered by JS -->
+                        </div>
+                        <span class="font-jua text-2xl text-slate-400">+</span>
+                        <div id="dice-2" class="dice-box w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center p-2">
+                            <!-- SVG Pip rendered by JS -->
+                        </div>
+                        <span class="font-jua text-2xl text-slate-400">=</span>
+                        <div id="dice-sum-box" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-amber-100 border-3 border-amber-400 flex flex-col items-center justify-center shadow-inner">
+                            <span class="text-[10px] font-bold text-amber-700 leading-none">합계</span>
+                            <span id="dice-sum-value" class="font-jua text-3xl sm:text-4xl text-amber-900 leading-tight">?</span>
+                        </div>
+                    </div>
+
+                    <!-- Feedback Message Box -->
+                    <div id="game-feedback-msg" class="min-h-[28px] text-xs sm:text-sm font-bold text-slate-600 mb-2">
+                        주사위 2개의 합에 놓인 모든 말이 제거됩니다.
+                    </div>
+
+                    <!-- Roll Dice Button -->
+                    <button id="btn-roll-dice" onclick="rollDiceTurn()"
+                        class="btn-3d w-full py-3.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-jua text-xl sm:text-2xl rounded-2xl tracking-wider flex items-center justify-center gap-2">
+                        <span>🎲</span>
+                        <span id="btn-roll-text">주사위 굴리기</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column: Game Board (8 cols) -->
+            <div class="lg:col-span-8 bg-[#F5E6D3] rounded-3xl shadow-lg border-4 border-[#D4B895] p-3 sm:p-5 flex flex-col justify-center">
+                <div class="grid grid-cols-4 gap-2.5 sm:gap-3.5 h-full">
+                    <!-- Top-Left Title & Legend Cell -->
+                    <div class="bg-[#EAD4B7] border-2 border-[#C8A982] rounded-2xl flex flex-col items-center justify-center p-2 text-center shadow-inner">
+                        <span class="font-jua text-2xl sm:text-3xl text-[#6B4C2A]">놀이판</span>
+                        <div class="mt-2 space-y-1 text-xs font-bold">
+                            <div class="flex items-center justify-center gap-1.5 text-blue-800">
+                                <span class="w-3 h-3 rounded-full token-p1 inline-block"></span>
+                                <span id="legend-p1">선공</span>
+                            </div>
+                            <div class="flex items-center justify-center gap-1.5 text-rose-800">
+                                <span class="w-3 h-3 rounded-full token-p2 inline-block"></span>
+                                <span id="legend-p2">후공</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Game Board Cells 2 to 12 rendered by JS -->
+                    <div id="game-grid-cells" class="contents"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             SCREEN 4: VICTORY SCREEN (승리 화면)
+        =========================================== -->
+        <section id="screen-victory" class="screen-section hidden-screen w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-4 border-amber-300 p-6 sm:p-10 text-center relative overflow-hidden">
+            <div class="text-6xl sm:text-7xl mb-3 animate-bounce">🏆</div>
+            <div id="victory-badge" class="inline-block px-4 py-1 rounded-full text-sm font-extrabold bg-blue-100 text-blue-700 mb-2">
+                플레이어 1 승리!
+            </div>
+            <h2 id="victory-title" class="font-jua text-4xl sm:text-5xl text-slate-800 mb-2">
+                선공 승리!
+            </h2>
+            <p id="victory-subtitle" class="text-slate-600 font-medium text-base sm:text-lg mb-6">
+                자신의 말 10개를 가장 먼저 모두 제거했습니다!
+            </p>
+
+            <!-- Final Match Summary -->
+            <div class="grid grid-cols-2 gap-4 bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 mb-6">
+                <!-- P1 Final -->
+                <div id="vic-card-p1" class="bg-white rounded-xl p-3 border-2 border-blue-200">
+                    <div class="flex items-center justify-center gap-1.5 mb-1">
+                        <span class="w-3.5 h-3.5 rounded-full token-p1"></span>
+                        <span id="vic-name-p1" class="font-bold text-slate-800">선공</span>
+                    </div>
+                    <p class="text-xs text-slate-500">최종 남은 말</p>
+                    <p id="vic-rem-p1" class="font-jua text-3xl text-blue-600">0개</p>
+                </div>
+                <!-- P2 Final -->
+                <div id="vic-card-p2" class="bg-white rounded-xl p-3 border-2 border-rose-200">
+                    <div class="flex items-center justify-center gap-1.5 mb-1">
+                        <span class="w-3.5 h-3.5 rounded-full token-p2"></span>
+                        <span id="vic-name-p2" class="font-bold text-slate-800">후공</span>
+                    </div>
+                    <p class="text-xs text-slate-500">최종 남은 말</p>
+                    <p id="vic-rem-p2" class="font-jua text-3xl text-rose-600">3개</p>
+                </div>
+            </div>
+
+            <!-- Math Reflection Tip -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-3.5 mb-7 text-xs sm:text-sm text-indigo-900 text-left">
+                <span class="font-bold">📊 수학 탐구 포인트:</span> 서로 다른 두 주사위를 동시에 굴릴 때 나올 수 있는 모든 경우의 수는 <b>36가지</b>입니다. 어떤 숫자의 합이 나올 확률이 가장 높았나요? 다음 판에는 확률을 계산해 말을 재배치해 보세요!
+            </div>
+
+            <!-- Restart Buttons -->
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button onclick="restartSamePlayers()" class="btn-3d w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-jua text-xl rounded-2xl">
+                    🔄 다시 게임하기 (말 재배치)
+                </button>
+                <button onclick="goToHome()" class="btn-3d w-full sm:w-auto px-8 py-3.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-jua text-xl rounded-2xl">
+                    🏠 처음으로
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==========================================
+         MODALS (Custom UI instead of alert/confirm)
+    =========================================== -->
+    <!-- Help / Rules Modal -->
+    <div id="modal-help" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border-2 border-slate-200 animate-pop">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h3 class="font-jua text-2xl text-slate-800 flex items-center gap-2">
+                    <span>📖</span> 놀이의 전략 게임 규칙
+                </h3>
+                <button onclick="closeHelpModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 font-bold text-slate-600">✕</button>
+            </div>
+            <div class="space-y-3 text-sm text-slate-700 leading-relaxed max-h-[65vh] overflow-y-auto pr-1">
+                <div class="bg-blue-50 p-3 rounded-xl">
+                    <p class="font-bold text-blue-900 mb-1">1. 말 배치 규칙 (각자 10개)</p>
+                    <p>2부터 12까지의 숫자 칸 중 <b>반드시 서로 다른 4칸 이상</b>에 자신의 말 10개를 나누어 배치합니다. 한 칸에 여러 개를 쌓을 수 있습니다.</p>
+                </div>
+                <div class="bg-amber-50 p-3 rounded-xl">
+                    <p class="font-bold text-amber-900 mb-1">2. 주사위 굴리기 및 말 제거</p>
+                    <p>선공과 후공이 번갈아 <b>주사위 2개</b>를 동시에 굴립니다. 두 주사위 눈의 합에 해당하는 숫자 칸에 놓인 <b>자신과 상대방의 모든 말</b>이 제거됩니다.</p>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-xl">
+                    <p class="font-bold text-emerald-900 mb-1">3. 승리 및 종료 조건</p>
+                    <p>자신의 말 10개를 <b>가장 먼저 모두 제거</b>하면 승리합니다. 단, 두 사람의 남은 말이 <b>모두 같은 한 칸에만 남아 있을 경우</b> 남은 말의 수가 <b>더 적은 사람이 승리</b>하며, 개수마저 같으면 <b>무승부</b>로 종료됩니다.</p>
+                </div>
+            </div>
+            <button onclick="closeHelpModal()" class="btn-3d w-full mt-5 py-3 bg-indigo-600 text-white font-jua text-lg rounded-xl">
+                확인했습니다
+            </button>
+        </div>
+    </div>
+
+    <!-- Pass Tablet / Intermission Modal (Between P1 and P2 setup) -->
+    <div id="modal-pass" class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border-4 border-rose-300 animate-pop">
+            <div class="text-5xl mb-3">🤝</div>
+            <h3 class="font-jua text-2xl sm:text-3xl text-slate-800 mb-2">
+                태블릿을 <span id="pass-target-name" class="text-rose-600">후공</span>님에게 넘겨주세요!
+            </h3>
+            <p class="text-slate-600 text-sm sm:text-base mb-6">
+                선공의 말 배치가 비밀리에 저장되었습니다.<br>
+                이제 <b>플레이어 2(빨간색)</b>가 말을 배치할 차례입니다.
+            </p>
+            <button onclick="startPlayer2Setup()" class="btn-3d w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-jua text-xl rounded-2xl">
+                네, 배치 시작할게요! ▶
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Go Home Modal -->
+    <div id="modal-confirm-home" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border-2 border-slate-200 animate-pop">
+            <div class="text-4xl mb-2">🏠</div>
+            <h3 class="font-jua text-2xl text-slate-800 mb-2">처음 화면으로 돌아갈까요?</h3>
+            <p class="text-slate-500 text-sm mb-5">현재 진행 중인 게임 내용은 저장되지 않습니다.</p>
+            <div class="grid grid-cols-2 gap-2.5">
+                <button onclick="closeConfirmHome()" class="py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">계속하기</button>
+                <button onclick="goToHome()" class="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 font-bold text-white">처음으로</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification for minor alerts -->
+    <div id="toast-msg" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+        안내 메시지
+    </div>
+
+    <!-- ==========================================
+         GAME LOGIC & INTERACTIVITY
+    =========================================== -->
+    <script>
+        // --- Game State ---
+        const state = {
+            p1Name: '선공',
+            p2Name: '후공',
+            setupPhase: 1, // 1 for P1, 2 for P2
+            p1Board: {},   // { 2: 0, 3: 0, ..., 12: 0 }
+            p2Board: {},   // { 2: 0, 3: 0, ..., 12: 0 }
+            currentTurn: 1, // 1 or 2
+            isRolling: false,
+            soundEnabled: true,
+            turnCount: 0
+        };
+
+        // Initialize empty board dictionaries (2 to 12)
+        function createEmptyBoard() {
+            const b = {};
+            for (let i = 2; i <= 12; i++) b[i] = 0;
+            return b;
+        }
+
+        // --- Sound Effects using Tone.js (Synthesized, no external files) ---
+        let synth = null;
+        async function initAudio() {
+            if (!state.soundEnabled) return;
+            try {
+                if (Tone.context.state !== 'running') {
+                    await Tone.start();
+                }
+                if (!synth) {
+                    synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.volume.value = -8;
+                }
+            } catch (e) {
+                console.warn('Audio init skipped:', e);
+            }
+        }
+
+        function playSound(type) {
+            if (!state.soundEnabled) return;
+            initAudio().then(() => {
+                if (!synth) return;
+                const now = Tone.now();
+                if (type === 'pop') {
+                    synth.triggerAttackRelease('C5', '32n', now);
+                } else if (type === 'remove') {
+                    synth.triggerAttackRelease('A4', '32n', now);
+                } else if (type === 'dice') {
+                    synth.triggerAttackRelease('E4', '32n', now);
+                    synth.triggerAttackRelease('G4', '32n', now + 0.08);
+                    synth.triggerAttackRelease('B4', '32n', now + 0.16);
+                } else if (type === 'hit') {
+                    synth.triggerAttackRelease(['C5', 'E5', 'G5'], '8n', now);
+                } else if (type === 'miss') {
+                    synth.triggerAttackRelease('D4', '16n', now);
+                    synth.triggerAttackRelease('C4', '8n', now + 0.12);
+                } else if (type === 'win') {
+                    synth.triggerAttackRelease('C5', '16n', now);
+                    synth.triggerAttackRelease('E5', '16n', now + 0.12);
+                    synth.triggerAttackRelease('G5', '16n', now + 0.24);
+                    synth.triggerAttackRelease('C6', '4n', now + 0.36);
+                }
+            });
+        }
+
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            document.getElementById('sound-icon').textContent = state.soundEnabled ? '🔊' : '🔇';
+            document.getElementById('sound-text').textContent = state.soundEnabled ? '효과음 ON' : '효과음 OFF';
+            if (state.soundEnabled) playSound('pop');
+        }
+
+        // --- Toast Helper ---
+        let toastTimer = null;
+        function showToast(msg) {
+            const el = document.getElementById('toast-msg');
+            el.textContent = msg;
+            el.classList.remove('opacity-0');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                el.classList.add('opacity-0');
+            }, 2200);
+        }
+
+        // --- Screen Navigation ---
+        function showScreen(screenId) {
+            ['screen-start', 'screen-setup', 'screen-game', 'screen-victory'].forEach(id => {
+                document.getElementById(id).classList.add('hidden-screen');
+            });
+            document.getElementById(screenId).classList.remove('hidden-screen');
+
+            // Show '처음으로' button on top header except on start screen
+            const homeBtn = document.getElementById('btn-home-top');
+            if (screenId === 'screen-start') {
+                homeBtn.classList.add('hidden');
+            } else {
+                homeBtn.classList.remove('hidden');
+            }
+        }
+
+        // --- Modal Handlers ---
+        function openHelpModal() { document.getElementById('modal-help').classList.remove('hidden'); }
+        function closeHelpModal() { document.getElementById('modal-help').classList.add('hidden'); }
+        function confirmGoHome() { document.getElementById('modal-confirm-home').classList.remove('hidden'); }
+        function closeConfirmHome() { document.getElementById('modal-confirm-home').classList.add('hidden'); }
+
+        function goToHome() {
+            closeConfirmHome();
+            showScreen('screen-start');
+        }
+
+        // --- STEP 1 -> STEP 2: Start Setup ---
+        function startGameSetup() {
+            initAudio();
+            playSound('pop');
+
+            const p1Input = document.getElementById('input-p1-name').value.trim();
+            const p2Input = document.getElementById('input-p2-name').value.trim();
+            state.p1Name = p1Input || '선공';
+            state.p2Name = p2Input || '후공';
+
+            state.p1Board = createEmptyBoard();
+            state.p2Board = createEmptyBoard();
+            state.setupPhase = 1;
+
+            renderSetupScreen();
+            showScreen('screen-setup');
+        }
+
+        function restartSamePlayers() {
+            playSound('pop');
+            state.p1Board = createEmptyBoard();
+            state.p2Board = createEmptyBoard();
+            state.setupPhase = 1;
+            renderSetupScreen();
+            showScreen('screen-setup');
+        }
+
+        // --- STEP 2: Piece Placement Logic ---
+        function renderSetupScreen() {
+            const isP1 = state.setupPhase === 1;
+            const currentBoard = isP1 ? state.p1Board : state.p2Board;
+            const playerName = isP1 ? state.p1Name : state.p2Name;
+
+            // Update Left Panel Styling
+            const stepBadge = document.getElementById('setup-step-badge');
+            const playerCard = document.getElementById('setup-player-card');
+            const playerToken = document.getElementById('setup-player-token');
+            const playerRole = document.getElementById('setup-player-role');
+            const playerNameEl = document.getElementById('setup-player-name');
+            const btnDone = document.getElementById('btn-setup-done');
+
+            if (isP1) {
+                stepBadge.className = 'px-3 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-700';
+                stepBadge.textContent = 'STEP 1 / 2 · 선공 배치';
+                playerCard.className = 'rounded-2xl p-4 mb-4 border-2 bg-blue-50 border-blue-300';
+                playerToken.className = 'w-10 h-10 rounded-full token-p1 flex-shrink-0';
+                playerRole.textContent = '플레이어 1 (파란색)';
+                playerRole.className = 'text-xs font-bold text-blue-700';
+                btnDone.className = 'btn-3d w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-jua text-xl rounded-2xl tracking-wide';
+            } else {
+                stepBadge.className = 'px-3 py-1 rounded-full text-xs font-extrabold bg-rose-100 text-rose-700';
+                stepBadge.textContent = 'STEP 2 / 2 · 후공 배치';
+                playerCard.className = 'rounded-2xl p-4 mb-4 border-2 bg-rose-50 border-rose-300';
+                playerToken.className = 'w-10 h-10 rounded-full token-p2 flex-shrink-0';
+                playerRole.textContent = '플레이어 2 (빨간색)';
+                playerRole.className = 'text-xs font-bold text-rose-700';
+                btnDone.className = 'btn-3d w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-jua text-xl rounded-2xl tracking-wide';
+            }
+            playerNameEl.textContent = playerName;
+
+            // Calculate Totals
+            let totalPlaced = 0;
+            let distinctCells = 0;
+            for (let num = 2; num <= 12; num++) {
+                const count = currentBoard[num];
+                totalPlaced += count;
+                if (count > 0) distinctCells++;
+            }
+
+            document.getElementById('setup-count-placed').textContent = totalPlaced;
+            document.getElementById('setup-count-cells').textContent = distinctCells;
+
+            // Validation Check (10 tokens total AND >= 4 distinct cells)
+            const isValid = (totalPlaced === 10 && distinctCells >= 4);
+            btnDone.disabled = !isValid;
+
+            const valMsg = document.getElementById('setup-validation-msg');
+            if (isValid) {
+                valMsg.className = 'text-xs sm:text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-xl p-3 mb-4';
+                valMsg.innerHTML = '✅ 배치 조건을 모두 만족했습니다! <b>[배치 완료]</b>를 눌러주세요.';
+            } else if (totalPlaced === 10 && distinctCells < 4) {
+                valMsg.className = 'text-xs sm:text-sm font-bold text-rose-800 bg-rose-100 border border-rose-300 rounded-xl p-3 mb-4';
+                valMsg.innerHTML = `⚠️ 현재 <b>${distinctCells}칸</b>에만 놓았습니다. 서로 다른 <b>4칸 이상</b>에 나누어 놓아야 합니다!`;
+            } else {
+                valMsg.className = 'text-xs sm:text-sm font-medium text-slate-600 bg-slate-100 rounded-xl p-3 mb-4';
+                valMsg.innerHTML = `👉 숫자 칸을 터치해 남은 <b>${10 - totalPlaced}개</b>의 말을 배치하세요. (최소 4칸 이상)`;
+            }
+
+            // Render 2~12 Grid Cells
+            const gridContainer = document.getElementById('setup-grid-cells');
+            gridContainer.innerHTML = '';
+
+            for (let num = 2; num <= 12; num++) {
+                const count = currentBoard[num];
+                const cell = document.createElement('div');
+                cell.className = `board-cell interactive rounded-2xl p-2 sm:p-3 flex flex-col justify-between cursor-pointer relative min-h-[105px] sm:min-h-[125px] ${count > 0 ? (isP1 ? 'border-blue-400 bg-blue-50/40' : 'border-rose-400 bg-rose-50/40') : ''}`;
+                
+                // Clicking the cell adds 1 token
+                cell.onclick = (e) => {
+                    if (e.target.closest('.btn-minus')) return;
+                    addSetupToken(num);
+                };
+
+                // Build visual tokens HTML
+                let tokensHtml = '';
+                const tokenClass = isP1 ? 'token-p1' : 'token-p2';
+                for (let t = 0; t < count; t++) {
+                    tokensHtml += `<span class="w-4 h-4 sm:w-5 sm:h-5 rounded-full ${tokenClass} inline-block animate-pop"></span>`;
+                }
+
+                cell.innerHTML = `
+                    <div class="flex items-center justify-between w-full">
+                        <span class="font-jua text-2xl sm:text-3xl text-slate-800 leading-none">${num}</span>
+                        ${count > 0 ? `
+                            <button type="button" onclick="removeSetupToken(${num})" class="btn-minus w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-black text-base flex items-center justify-center shadow-sm transition" title="말 1개 빼기">
+                                -
+                            </button>
+                        ` : `<span class="text-xs text-slate-300 font-bold">+추가</span>`}
+                    </div>
+                    <div class="flex flex-wrap gap-1 items-center justify-center my-1 min-h-[28px]">
+                        ${tokensHtml}
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-extrabold ${count > 0 ? (isP1 ? 'text-blue-600' : 'text-rose-600') : 'text-slate-400'}">
+                            ${count}개
+                        </span>
+                    </div>
+                `;
+                gridContainer.appendChild(cell);
+            }
+        }
+
+        function addSetupToken(num) {
+            const currentBoard = state.setupPhase === 1 ? state.p1Board : state.p2Board;
+            let total = Object.values(currentBoard).reduce((a, b) => a + b, 0);
+            if (total >= 10) {
+                showToast('이미 10개의 말을 모두 배치했습니다! 다른 칸의 [-]를 눌러 빼주세요.');
+                return;
+            }
+            currentBoard[num]++;
+            playSound('pop');
+            renderSetupScreen();
+        }
+
+        function removeSetupToken(num) {
+            const currentBoard = state.setupPhase === 1 ? state.p1Board : state.p2Board;
+            if (currentBoard[num] > 0) {
+                currentBoard[num]--;
+                playSound('remove');
+                renderSetupScreen();
+            }
+        }
+
+        function resetCurrentSetup() {
+            if (state.setupPhase === 1) state.p1Board = createEmptyBoard();
+            else state.p2Board = createEmptyBoard();
+            playSound('remove');
+            renderSetupScreen();
+        }
+
+        function randomCurrentSetup() {
+            const newBoard = createEmptyBoard();
+            // Guarantee at least 4 distinct cells first
+            const numbers = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            // Shuffle
+            for (let i = numbers.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+            }
+            // Place 1 token on 4 distinct numbers
+            for (let i = 0; i < 4; i++) {
+                newBoard[numbers[i]] = 1;
+            }
+            // Distribute remaining 6 tokens randomly
+            for (let r = 0; r < 6; r++) {
+                const randNum = Math.floor(Math.random() * 11) + 2;
+                newBoard[randNum]++;
+            }
+
+            if (state.setupPhase === 1) state.p1Board = newBoard;
+            else state.p2Board = newBoard;
+            playSound('dice');
+            renderSetupScreen();
+        }
+
+        function confirmPlayerSetup() {
+            playSound('hit');
+            if (state.setupPhase === 1) {
+                // Show pass tablet modal to P2
+                document.getElementById('pass-target-name').textContent = state.p2Name;
+                document.getElementById('modal-pass').classList.remove('hidden');
+            } else {
+                // Both ready -> Start Main Game!
+                startMainGame();
+            }
+        }
+
+        function startPlayer2Setup() {
+            document.getElementById('modal-pass').classList.add('hidden');
+            state.setupPhase = 2;
+            playSound('pop');
+            renderSetupScreen();
+        }
+
+        // --- STEP 3: Main Game Logic ---
+        function startMainGame() {
+            state.currentTurn = 1;
+            state.isRolling = false;
+            state.turnCount = 0;
+
+            // Set names
+            document.getElementById('game-name-p1').textContent = state.p1Name;
+            document.getElementById('game-name-p2').textContent = state.p2Name;
+            document.getElementById('legend-p1').textContent = state.p1Name;
+            document.getElementById('legend-p2').textContent = state.p2Name;
+
+            // Reset Dice Display
+            renderDiceFace('dice-1', 1);
+            renderDiceFace('dice-2', 6);
+            document.getElementById('dice-sum-value').textContent = '?';
+            document.getElementById('game-feedback-msg').textContent = '주사위 2개의 합에 놓인 모든 말이 제거됩니다.';
+
+            updateTurnUI();
+            renderGameBoard();
+            showScreen('screen-game');
+        }
+
+        function getRemainingCount(playerNum) {
+            const board = playerNum === 1 ? state.p1Board : state.p2Board;
+            return Object.values(board).reduce((a, b) => a + b, 0);
+        }
+
+        function updateTurnUI() {
+            const p1Rem = getRemainingCount(1);
+            const p2Rem = getRemainingCount(2);
+
+            document.getElementById('game-rem-p1').textContent = p1Rem;
+            document.getElementById('game-elim-p1').textContent = 10 - p1Rem;
+            document.getElementById('game-rem-p2').textContent = p2Rem;
+            document.getElementById('game-elim-p2').textContent = 10 - p2Rem;
+
+            const cardP1 = document.getElementById('game-card-p1');
+            const cardP2 = document.getElementById('game-card-p2');
+            const badgeP1 = document.getElementById('game-turn-badge-p1');
+            const badgeP2 = document.getElementById('game-turn-badge-p2');
+            const statusBanner = document.getElementById('game-status-banner');
+            const turnText = document.getElementById('game-turn-text');
+            const btnRoll = document.getElementById('btn-roll-dice');
+            const btnRollText = document.getElementById('btn-roll-text');
+
+            if (state.currentTurn === 1) {
+                cardP1.className = 'bg-white rounded-2xl p-3 sm:p-4 border-2 border-blue-500 turn-glow-p1 transition-all duration-300';
+                cardP2.className = 'bg-white rounded-2xl p-3 sm:p-4 border-2 border-slate-200 opacity-70 transition-all duration-300';
+                badgeP1.classList.remove('hidden');
+                badgeP2.classList.add('hidden');
+
+                statusBanner.className = 'w-full py-2 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 font-bold text-sm sm:text-base';
+                turnText.textContent = `🔵 [${state.p1Name}]님의 차례입니다!`;
+                btnRoll.className = 'btn-3d w-full py-3.5 sm:py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-jua text-xl sm:text-2xl rounded-2xl tracking-wider flex items-center justify-center gap-2';
+                btnRollText.textContent = `${state.p1Name} 주사위 굴리기`;
+            } else {
+                cardP2.className = 'bg-white rounded-2xl p-3 sm:p-4 border-2 border-rose-500 turn-glow-p2 transition-all duration-300';
+                cardP1.className = 'bg-white rounded-2xl p-3 sm:p-4 border-2 border-slate-200 opacity-70 transition-all duration-300';
+                badgeP2.classList.remove('hidden');
+                badgeP1.classList.add('hidden');
+
+                statusBanner.className = 'w-full py-2 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 font-bold text-sm sm:text-base';
+                turnText.textContent = `🔴 [${state.p2Name}]님의 차례입니다!`;
+                btnRoll.className = 'btn-3d w-full py-3.5 sm:py-4 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-jua text-xl sm:text-2xl rounded-2xl tracking-wider flex items-center justify-center gap-2';
+                btnRollText.textContent = `${state.p2Name} 주사위 굴리기`;
+            }
+        }
+
+        function renderGameBoard(highlightSum = null, isVanishing = false) {
+            const gridContainer = document.getElementById('game-grid-cells');
+            gridContainer.innerHTML = '';
+
+            for (let num = 2; num <= 12; num++) {
+                const c1 = state.p1Board[num];
+                const c2 = state.p2Board[num];
+                const isHit = (highlightSum === num);
+
+                const cell = document.createElement('div');
+                cell.id = `board-cell-${num}`;
+                cell.className = `board-cell rounded-2xl p-2 sm:p-3 flex flex-col justify-between relative min-h-[105px] sm:min-h-[125px] ${isHit ? 'highlight-hit' : ''}`;
+
+                // Build P1 and P2 visual tokens
+                let p1TokensHtml = '';
+                for (let i = 0; i < c1; i++) {
+                    p1TokensHtml += `<span class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full token-p1 inline-block ${isHit && isVanishing ? 'animate-vanish' : ''}"></span>`;
+                }
+                let p2TokensHtml = '';
+                for (let i = 0; i < c2; i++) {
+                    p2TokensHtml += `<span class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full token-p2 inline-block ${isHit && isVanishing ? 'animate-vanish' : ''}"></span>`;
+                }
+
+                cell.innerHTML = `
+                    <div class="flex items-center justify-between w-full">
+                        <span class="font-jua text-2xl sm:text-3xl text-slate-800 leading-none">${num}</span>
+                        <div class="flex items-center gap-1.5 text-xs font-extrabold">
+                            ${c1 > 0 ? `<span class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">${c1}</span>` : ''}
+                            ${c2 > 0 ? `<span class="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200">${c2}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1 my-1 justify-center min-h-[36px]">
+                        ${c1 > 0 ? `<div class="flex flex-wrap gap-1 justify-center">${p1TokensHtml}</div>` : ''}
+                        ${c2 > 0 ? `<div class="flex flex-wrap gap-1 justify-center">${p2TokensHtml}</div>` : ''}
+                        ${(c1 === 0 && c2 === 0) ? `<div class="text-center text-xs text-slate-300 font-medium">-</div>` : ''}
+                    </div>
+
+                    <div class="flex justify-between items-center text-[10px] sm:text-xs font-bold text-slate-400 border-t border-slate-100 pt-1">
+                        <span class="${c1 > 0 ? 'text-blue-600' : ''}">파랑 ${c1}</span>
+                        <span class="${c2 > 0 ? 'text-rose-600' : ''}">빨강 ${c2}</span>
+                    </div>
+                `;
+                gridContainer.appendChild(cell);
+            }
+        }
+
+        // SVG Dice Face Renderer (1 to 6)
+        function renderDiceFace(elementId, value) {
+            const el = document.getElementById(elementId);
+            const pipColor = value === 1 ? '#E11D48' : '#1E293B';
+            const pipPositions = {
+                1: [[50, 50]],
+                2: [[28, 28], [72, 72]],
+                3: [[25, 25], [50, 50], [75, 75]],
+                4: [[28, 28], [72, 28], [28, 72], [72, 72]],
+                5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
+                6: [[28, 24], [72, 24], [28, 50], [72, 50], [28, 76], [72, 76]]
+            };
+
+            const pips = pipPositions[value] || pipPositions[1];
+            const radius = value === 1 ? 11 : 8.5;
+            const circles = pips.map(([cx, cy]) =>
+                `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${pipColor}" />`
+            ).join('');
+
+            el.innerHTML = `<svg viewBox="0 0 100 100" class="w-full h-full">${circles}</svg>`;
+        }
+
+        // Roll 2 Dice Action
+        function rollDiceTurn() {
+            if (state.isRolling) return;
+            state.isRolling = true;
+
+            const btnRoll = document.getElementById('btn-roll-dice');
+            btnRoll.disabled = true;
+
+            const d1El = document.getElementById('dice-1');
+            const d2El = document.getElementById('dice-2');
+            d1El.classList.add('dice-rolling');
+            d2El.classList.add('dice-rolling');
+
+            document.getElementById('dice-sum-value').textContent = '...';
+            document.getElementById('game-feedback-msg').textContent = '주사위가 굴러가고 있습니다...';
+            playSound('dice');
+
+            // Animate random faces quickly for 650ms
+            let ticks = 0;
+            const rollInterval = setInterval(() => {
+                const temp1 = Math.floor(Math.random() * 6) + 1;
+                const temp2 = Math.floor(Math.random() * 6) + 1;
+                renderDiceFace('dice-1', temp1);
+                renderDiceFace('dice-2', temp2);
+                ticks++;
+                if (ticks >= 9) {
+                    clearInterval(rollInterval);
+                    finalizeDiceRoll();
+                }
+            }, 65);
+        }
+
+        function finalizeDiceRoll() {
+            const d1El = document.getElementById('dice-1');
+            const d2El = document.getElementById('dice-2');
+            d1El.classList.remove('dice-rolling');
+            d2El.classList.remove('dice-rolling');
+
+            // True random 1~6 for each die
+            const die1 = Math.floor(Math.random() * 6) + 1;
+            const die2 = Math.floor(Math.random() * 6) + 1;
+            const sum = die1 + die2;
+
+            renderDiceFace('dice-1', die1);
+            renderDiceFace('dice-2', die2);
+            document.getElementById('dice-sum-value').textContent = sum;
+
+            const removedP1 = state.p1Board[sum];
+            const removedP2 = state.p2Board[sum];
+            const totalRemoved = removedP1 + removedP2;
+
+            const feedbackEl = document.getElementById('game-feedback-msg');
+
+            if (totalRemoved > 0) {
+                // Play vanish animation first
+                playSound('hit');
+                renderGameBoard(sum, true);
+                feedbackEl.innerHTML = `<span class="text-amber-700">🎯 합계 <b>${sum}</b>! 파랑 <b>${removedP1}개</b>, 빨강 <b>${removedP2}개</b> 제거!</span>`;
+
+                setTimeout(() => {
+                    // Actually remove tokens
+                    state.p1Board[sum] = 0;
+                    state.p2Board[sum] = 0;
+                    renderGameBoard(sum, false);
+                    checkWinOrNextTurn();
+                }, 600);
+            } else {
+                // No tokens on this number
+                playSound('miss');
+                renderGameBoard(sum, false);
+                feedbackEl.innerHTML = `<span class="text-slate-500">💨 합계 <b>${sum}</b> 칸에는 말이 없어 제거되는 말이 없습니다!</span>`;
+
+                setTimeout(() => {
+                    checkWinOrNextTurn();
+                }, 650);
+            }
+        }
+
+        function checkWinOrNextTurn() {
+            const p1Rem = getRemainingCount(1);
+            const p2Rem = getRemainingCount(2);
+
+            // Check which cells still have tokens for P1 and P2
+            const p1ActiveCells = [];
+            const p2ActiveCells = [];
+            for (let num = 2; num <= 12; num++) {
+                if (state.p1Board[num] > 0) p1ActiveCells.push(num);
+                if (state.p2Board[num] > 0) p2ActiveCells.push(num);
+            }
+
+            // Special End Condition: Both players' remaining tokens exist ONLY on the exact same single cell
+            const isSingleSharedCellEnd = (
+                p1Rem > 0 &&
+                p2Rem > 0 &&
+                p1ActiveCells.length === 1 &&
+                p2ActiveCells.length === 1 &&
+                p1ActiveCells[0] === p2ActiveCells[0]
+            );
+
+            // Check victory condition (0 remaining tokens OR single shared cell end)
+            if (p1Rem === 0 || p2Rem === 0 || isSingleSharedCellEnd) {
+                // Update counts on UI briefly then trigger victory
+                document.getElementById('game-rem-p1').textContent = p1Rem;
+                document.getElementById('game-elim-p1').textContent = 10 - p1Rem;
+                document.getElementById('game-rem-p2').textContent = p2Rem;
+                document.getElementById('game-elim-p2').textContent = 10 - p2Rem;
+
+                let winner = 0; // 0: Draw, 1: P1, 2: P2
+                let endReason = '';
+
+                if (isSingleSharedCellEnd) {
+                    const lastCell = p1ActiveCells[0];
+                    if (p1Rem < p2Rem) {
+                        winner = 1;
+                        endReason = `두 사람의 말이 '${lastCell}' 칸에만 남아 말의 수가 더 적은 [${state.p1Name}]님이 승리했습니다!`;
+                    } else if (p2Rem < p1Rem) {
+                        winner = 2;
+                        endReason = `두 사람의 말이 '${lastCell}' 칸에만 남아 말의 수가 더 적은 [${state.p2Name}]님이 승리했습니다!`;
+                    } else {
+                        winner = 0;
+                        endReason = `두 사람의 말이 '${lastCell}' 칸에 똑같이 ${p1Rem}개씩만 남아 무승부로 종료되었습니다!`;
+                    }
+                } else {
+                    if (p1Rem === 0 && p2Rem === 0) {
+                        winner = 0;
+                        endReason = '두 플레이어의 남은 말이 동시에 모두 제거되어 무승부입니다!';
+                    } else if (p1Rem === 0) {
+                        winner = 1;
+                        endReason = '자신의 말 10개를 가장 먼저 모두 제거했습니다!';
+                    } else {
+                        winner = 2;
+                        endReason = '자신의 말 10개를 가장 먼저 모두 제거했습니다!';
+                    }
+                }
+
+                setTimeout(() => {
+                    showVictoryScreen(winner, p1Rem, p2Rem, endReason);
+                }, 450);
+                return;
+            }
+
+            // Switch turn
+            state.currentTurn = state.currentTurn === 1 ? 2 : 1;
+            state.isRolling = false;
+            document.getElementById('btn-roll-dice').disabled = false;
+            updateTurnUI();
+        }
+
+        // --- STEP 4: Victory Screen ---
+        function showVictoryScreen(winner, p1Rem, p2Rem, customReason = '') {
+            playSound('win');
+
+            const vicBadge = document.getElementById('victory-badge');
+            const vicTitle = document.getElementById('victory-title');
+            const vicSubtitle = document.getElementById('victory-subtitle');
+
+            if (winner === 1) {
+                vicBadge.className = 'inline-block px-4 py-1 rounded-full text-sm font-extrabold bg-blue-100 text-blue-700 mb-2';
+                vicBadge.textContent = '🔵 플레이어 1 승리!';
+                vicTitle.className = 'font-jua text-4xl sm:text-5xl text-blue-600 mb-2';
+                vicTitle.textContent = `${state.p1Name} 승리!`;
+            } else if (winner === 2) {
+                vicBadge.className = 'inline-block px-4 py-1 rounded-full text-sm font-extrabold bg-rose-100 text-rose-700 mb-2';
+                vicBadge.textContent = '🔴 플레이어 2 승리!';
+                vicTitle.className = 'font-jua text-4xl sm:text-5xl text-rose-600 mb-2';
+                vicTitle.textContent = `${state.p2Name} 승리!`;
+            } else {
+                vicBadge.className = 'inline-block px-4 py-1 rounded-full text-sm font-extrabold bg-amber-100 text-amber-800 mb-2';
+                vicBadge.textContent = '🤝 막상막하 승부!';
+                vicTitle.className = 'font-jua text-4xl sm:text-5xl text-amber-600 mb-2';
+                vicTitle.textContent = '무승부!';
+            }
+
+            vicSubtitle.textContent = customReason || '자신의 말 10개를 가장 먼저 모두 제거했습니다!';
+
+            document.getElementById('vic-name-p1').textContent = state.p1Name;
+            document.getElementById('vic-rem-p1').textContent = `${p1Rem}개`;
+            document.getElementById('vic-name-p2').textContent = state.p2Name;
+            document.getElementById('vic-rem-p2').textContent = `${p2Rem}개`;
+
+            showScreen('screen-victory');
+
+            // Trigger celebratory confetti
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 90,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
